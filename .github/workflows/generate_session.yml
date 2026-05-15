@@ -1,0 +1,63 @@
+name: 🎯 استخراج جلسة Pyrogram
+
+on:
+  # تشغيل يدوي فقط (للأمان)
+  workflow_dispatch:
+    inputs:
+      phone_code:
+        description: '📱 رمز التحقق المرسل إلى تليجرام'
+        required: true
+        type: string
+      twofa_password:
+        description: '🔐 كلمة المرور (إذا كان التفعيل الثنائي مفعلاً)'
+        required: false
+        type: string
+
+jobs:
+  generate-session:
+    name: إنشاء جلسة Pyrogram
+    runs-on: ubuntu-latest
+    timeout-minutes: 10  # ينتهي بعد 10 دقائق
+    
+    steps:
+      - name: 📥 تحميل الكود
+        uses: actions/checkout@v4
+      
+      - name: 🐍 إعداد Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: 📦 تثبيت المكتبات
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: 🚀 تشغيل سكريبت الاستخراج
+        env:
+          API_ID: ${{ secrets.API_ID }}
+          API_HASH: ${{ secrets.API_HASH }}
+          PHONE_NUMBER: ${{ secrets.PHONE_NUMBER }}
+          PHONE_CODE: ${{ github.event.inputs.phone_code }}
+          PASSWORD: ${{ github.event.inputs.twofa_password }}
+        run: python generate_session.py
+      
+      - name: 📤 رفع الجلسة كـ Artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pyrogram-session
+          path: session.txt
+          retention-days: 1  # يتم حذف الملف بعد يوم واحد
+      
+      - name: ✅ إشعار النجاح
+        if: success()
+        run: |
+          echo "✅ تم إنشاء الجلسة بنجاح!"
+          echo "📁 قم بتنزيل الملف من Artifacts"
+      
+      - name: ❌ إشعار الفشل
+        if: failure()
+        run: |
+          echo "❌ فشل إنشاء الجلسة"
+          echo "📝 تحقق من البيانات وأعد المحاولة"
