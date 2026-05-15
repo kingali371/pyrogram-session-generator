@@ -1,5 +1,11 @@
 # 🎯 مولد جلسات Pyrogram
 
+[![CI/CD Pipeline](https://github.com/YourUsername/pyrogram-session-generator/actions/workflows/test.yml/badge.svg)](https://github.com/YourUsername/pyrogram-session-generator/actions/workflows/test.yml)
+[![codecov](https://codecov.io/gh/YourUsername/pyrogram-session-generator/branch/main/graph/badge.svg)](https://codecov.io/gh/YourUsername/pyrogram-session-generator)
+[![Python Version](https://img.shields.io/badge/python-3.8+-blue.svg)](https://python.org)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Security: bandit](https://img.shields.io/badge/security-bandit-yellow.svg)](https://github.com/PyCQA/bandit)
+[![License](https://img.shields.io/badge/license-MIT-red.svg)](LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.7+-blue.svg)](https://python.org)
 [![Pyrogram](https://img.shields.io/badge/pyrogram-2.0+-green.svg)](https://docs.pyrogram.org)
 [![License](https://img.shields.io/badge/license-MIT-red.svg)](LICENSE)
