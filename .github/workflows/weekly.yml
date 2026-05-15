@@ -1,0 +1,40 @@
+name: 📅 اختبارات أسبوعية متقدمة
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'  # كل يوم أحد
+  workflow_dispatch:
+
+jobs:
+  deep_test:
+    name: 🔍 اختبار متعمق
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 🔄 استنساخ المشروع
+      uses: actions/checkout@v3
+      
+    - name: 🐍 تثبيت Python متعدد الإصدارات
+      uses: actions/setup-python@v4
+      with:
+        python-version: |
+          3.8
+          3.9
+          3.10
+          3.11
+          
+    - name: 🧪 اختبار التكامل
+      run: |
+        # اختبار التوافق مع إصدارات Python المختلفة
+        for version in 3.8 3.9 3.10 3.11; do
+          echo "اختبار مع Python $version"
+          docker run --rm -v $(pwd):/app -w /app python:$version bash -c "
+            pip install -r requirements.txt && pytest tests/ -v
+          "
+        done
+        
+    - name: 🐳 اختبار حاويات Docker
+      run: |
+        # بناء صورة Docker
+        docker build -t session-generator .
+        docker run --rm session-generator python -c "from src.session_generator import SessionGenerator; print('✅ يعمل في Docker')"
