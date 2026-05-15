@@ -1,0 +1,205 @@
+name: CI/CD - اختبار وتطوير مولد جلسات Pyrogram
+
+on:
+  push:
+    branches: [ main, master, develop ]
+    paths-ignore:
+      - 'README.md'
+      - 'docs/**'
+  pull_request:
+    branches: [ main, master ]
+  schedule:
+    # تشغيل الاختبارات كل يوم في الساعة 00:00
+    - cron: '0 0 * * *'
+  workflow_dispatch:  # للسماح بالتشغيل اليدوي
+
+jobs:
+  # job 1: اختبار الكود
+  test:
+    name: 🧪 اختبار الكود
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        python-version: ['3.8', '3.9', '3.10', '3.11']
+        os: [ubuntu-latest, windows-latest, macos-latest]
+      fail-fast: false  # الاستمرار في الاختبار حتى لو فشل أحدهم
+    
+    steps:
+    - name: 🔄 استنساخ المشروع
+      uses: actions/checkout@v3
+      
+    - name: 🐍 تثبيت Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        
+    - name: 📦 تثبيت المتطلبات
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-cov flake8 black mypy
+        
+    - name: 🔍 فحص الكود (Linting)
+      run: |
+        flake8 src/ --count --statistics --show-source
+        black src/ --check
+        
+    - name: 🔒 فحص الأنواع (Type Checking)
+      run: |
+        mypy src/ --ignore-missing-imports
+        
+    - name: 🧪 تشغيل الاختبارات
+      run: |
+        pytest tests/ -v --cov=src --cov-report=xml --cov-report=html
+        
+    - name: 📊 رفع تقرير التغطية
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-${{ matrix.python-version }}-${{ matrix.os }}
+        
+    - name: 💾 حفظ تقارير الاختبارات
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: test-reports-${{ matrix.python-version }}-${{ matrix.os }}
+        path: |
+          coverage.xml
+          htmlcov/
+          pytest.log
+
+  # job 2: اختبار الأمان
+  security:
+    name: 🔒 فحص الأمان
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 🔄 استنساخ المشروع
+      uses: actions/checkout@v3
+      
+    - name: 🐍 تثبيت Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+        
+    - name: 📦 تثبيت أدوات الأمان
+      run: |
+        pip install bandit safety pip-audit
+        
+    - name: 🛡️ فحص Bandit
+      run: |
+        bandit -r src/ -f json -o bandit-report.json || true
+        
+    - name: 📦 فحص المكتبات الآمنة
+      run: |
+        safety check
+        pip-audit
+        
+    - name: 💾 حفظ تقارير الأمان
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: security-reports
+        path: |
+          bandit-report.json
+          security.log
+
+  # job 3: اختبار الأداء
+  performance:
+    name: ⚡ اختبار الأداء
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 🔄 استنساخ المشروع
+      uses: actions/checkout@v3
+      
+    - name: 🐍 تثبيت Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+        
+    - name: 📦 تثبيت المتطلبات
+      run: |
+        pip install -r requirements.txt
+        pip install pytest-benchmark
+        
+    - name: ⏱️ تشغيل اختبارات الأداء
+      run: |
+        pytest tests/test_performance.py -v --benchmark-only --benchmark-json=performance.json
+        
+    - name: 💾 حفظ نتائج الأداء
+      uses: actions/upload-artifact@v3
+      with:
+        name: performance-reports
+        path: performance.json
+
+  # job 4: البناء والنشر التلقائي (اختياري)
+  build:
+    name: 📦 بناء الحزمة
+    needs: [test, security, performance]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: 🔄 استنساخ المشروع
+      uses: actions/checkout@v3
+      
+    - name: 🐍 تثبيت Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+        
+    - name: 📦 تثبيت أدوات البناء
+      run: |
+        pip install build twine
+        
+    - name: 🔨 بناء الحزمة
+      run: |
+        python -m build
+        
+    - name: 📤 رفع الحزمة كـ Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: package
+        path: dist/
+        
+    - name: 🚀 نشر إلى PyPI (اختياري)
+      env:
+        TWINE_USERNAME: __token__
+        TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+      run: |
+        twine upload dist/* || echo "لم يتم النشر - يلزم إعداد PyPI token"
+
+  # job 5: إشعار النتائج
+  notify:
+    name: 📢 إشعار النتائج
+    needs: [test, security, performance, build]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: 📊 تجميع النتائج
+      run: |
+        echo "✅ الاختبارات: ${{ needs.test.result }}"
+        echo "✅ الأمان: ${{ needs.security.result }}"
+        echo "✅ الأداء: ${{ needs.performance.result }}"
+        echo "✅ البناء: ${{ needs.build.result }}"
+        
+    - name: 💬 إرسال إشعار للتيليجرام (اختياري)
+      uses: appleboy/telegram-action@master
+      if: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      with:
+        to: ${{ secrets.TELEGRAM_CHAT_ID }}
+        token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        message: |
+          🚀 مشروع مولد جلسات Pyrogram
+            
+          📊 نتائج CI/CD:
+          ✅ الاختبارات: ${{ needs.test.result }}
+          ✅ الأمان: ${{ needs.security.result }}
+          ✅ الأداء: ${{ needs.performance.result }}
+          📦 البناء: ${{ needs.build.result }}
+          
+          🔗 https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
